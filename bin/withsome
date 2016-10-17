@@ -1,0 +1,491 @@
+#!/bin/bash
+
+######################################################################
+#
+# withsome
+#
+# Run programs on nearby files without knowing exact path names.
+#
+# See docs directory for more extensive description and examples.
+#
+# See "t/" test directory for tests attempting to verify correctness
+# on your system.
+#
+# Ronald Schmidt
+# Version 0.19
+#
+######################################################################
+
+
+declare exec_path=`dirname $0`
+declare ws_ignore_l=$WS_IGNORE
+declare -i find_was_verified setup_prune
+
+
+#echo ws_ignore is $WS_IGNORE
+#echo ws_ignore local is $ws_ignore_l
+
+# should user be presented with option to run if one search failed
+#   but others succeded ?  -- 
+# fine - but minor - get back to it - DO add tests
+
+# decide whether to present before executing
+
+# lists of safe/forbidden
+# match on basename for forbidden
+# match on `type -t` and basename for safe
+
+# need cdpath equiv ??
+# old idea was infer search from cwd
+#   want default to search longest matching prefix from withsomepath
+#   check if first arg is dir or exe
+#   if its an exe check for prefix matching of cwd
+#       how to do this ??
+#       pwd then dirname until match
+# step 1
+#   cd to each : seperated path to get regularized list of paths
+#   pushd cd .. until find match in regularized lists
+#
+
+
+######################################################################
+# to copy array
+# my_array=(${array_to_copy[@]})
+######################################################################
+
+
+
+. $exec_path/withsome-util/selsome.sh
+
+######################################################################
+#   if args delimited by '-' put args after '-' in x_cmd_a
+######################################################################
+declare -a x_cmd_a
+collect_cmd_args ()
+{
+    while [ -n "$1" ] && [ "$1" != '-' ] ; do shift ; done
+
+    if [ $1 = '-' ] ; then shift ; x_cmd_a=( "$@" ) ; fi
+
+
+#   problem_path_chars=`echo -e "[ \t\n*?\[\]{}$]"`
+#   still wondering about problem_path_chars
+#	for arg in "$@"
+#	do		
+#		if [ "${arg#*$problem_path_chars}" != "$arg" ] ; then
+#			arg="'$arg'"
+#		fi
+#		x_cmd_a[ ${#x_cmd_a[@]} ]="$arg"
+#		echo x_cmd_a "${x_cmd_a[@]}" 1>&2
+#	done
+#	echo test 1 "${x_cmd_a[@]}" 1>&2
+
+}
+
+######################################################################
+#   convert FIND_ARGS_PRUNE_DIRS configuration into prune paths for find
+#       to ignore things like svn copies etc
+######################################################################
+print_prune ()
+{
+	local IFS=':'
+	local rc='('
+	local first
+	for arg in $ws_ignore_l ; do
+		if [ -n "$first" ]
+		then
+			rc="$rc -o -path */$arg/*"
+		else
+			rc="$rc -path */$arg/*"
+			first=1
+		fi
+	done
+	rc="$rc ) -prune -o "
+
+	if [ -n "$first" ] ; then
+		echo $rc
+	fi
+}
+
+######################################################################
+#   get soft link and mount follow options from WS_FOLLOW env var
+######################################################################
+compute_follow ()
+{
+    local ws_follow_l=`echo $WS_FOLLOW | tr A-Z a-z`
+
+    case "$ws_follow_l" in
+        all)    echo "-L" ;;
+        link)   echo "-L -mount"    ;;
+        links)  echo "-L -mount"    ;;
+        mount)  echo "-H"           ;;  
+        * )     echo "-H -mount"    ;;
+    esac
+}
+
+######################################################################
+#   Process one argument to be found / selected.
+#   Need further thought about following links (soft)
+######################################################################
+find_and_select ()
+{
+#   create the prune arguments if any
+	if [ -z "$setup_prune" ] ; then
+		prune_args=`print_prune`
+		setup_prune=1
+	fi
+
+#    echo prune cfg is $prune_args 1>&2
+#	echo arg passed to find "$2" 1>&2
+
+#   by default refuse to find across mount points
+#   be a bit careful because mountctl2 needs to be in different pos
+#   from mountctl1
+    local -a follow_opts=(`compute_follow`)
+
+    local mountctl1="${follow_opts[0]}"
+    local mountctl2="${follow_opts[1]}"
+
+   
+# Yep ... lots of debugging junk below 
+#    if [ "$FINDARGS_OK_MOUNT" ] ; then
+#        unset mountctl
+#    fi
+
+    local find_cmd=(find $mountctl1 "${find_root_a[@]}" $mountctl2 $prune_args -name "$1")
+    local module_search=''
+    if [ -z "${1##*::*}" ] ; then # matches :: for Perl module
+        module_search=${1#\*}
+        module_search=${module_search%\*}
+        find_cmd[ ${#find_cmd[@]} ]='-o'
+        find_cmd[ ${#find_cmd[@]} ]='-ipath'
+        # need .pm extension to avoid matching directories like module name
+        find_cmd[ ${#find_cmd[@]} ]="*${module_search//:://}*.pm"
+    fi
+    find_cmd[ ${#find_cmd[@]} ]='-print'
+
+    # should actually do seperate sort for each find root - TODO
+    local match=$("${find_cmd[@]}")
+
+#	prune_args="( -path '*/.svn/*' -prune ) -o"
+#	echo "${find_cmd[@]}" 1>&2
+#	local match=$(find $1 $prune_args -name $2 -print)
+#	echo "match is $match" 1>&2
+
+#   count lines of match result to get match count
+#   if 1 match take it
+#   if multiple matches let user select
+	local match_count
+	if [ "$match" ] ; then
+	    match_count=`IFS=''; echo $match | wc -l`
+
+#	echo match count is $match_count
+
+        if [ "$ws_ls_all" ] ; then
+            echo 1
+            local IFS=''
+            echo $match |
+                $exec_path/withsome-util/sortp_related.pl |
+                tr -d '\r'
+    	elif [ "$match_count" -gt 1 ] ; then
+            echo 1
+            local IFS='
+'
+            
+            # last tr for cygwin happiness
+            selectsome `IFS=''
+                echo $match |
+                    $exec_path/withsome-util/sortp_related.pl |
+                    tr -d '\r'`
+#            echo 1>&2  # possible alternate path for no perl installed
+#            selectsome `IFS=''; echo $match | time sort`
+        else
+            echo 0
+            echo "$match"
+        fi
+
+	else
+		echo No match found for "$1" using command "${find_cmd[@]}" 1>&2
+		echo 0
+	fi
+}
+
+declare -i unverified=0
+declare -i verified=0
+verify ()
+{
+    local ver_answ
+    read -p " - Empty reply accepts, anything else aborts ("help" for explanation)? " ver_answ
+    if [ "$ver_answ" ] ; then
+        ver_answ=$(echo $ver_answ | tr A-Z a-z)
+        if [ "$ver_answ" == 'help' ] ; then
+            echo 'Either one of the file arguments was not found * OR *' 1>&2
+            echo at least one argument to the command was found but not selected from a menu. 1>&2
+        fi
+        return 1;
+    else
+        return 0;
+    fi
+}
+
+
+declare -a find_root_a invalid_find_root_a
+declare -a safe_cmd_a forbidden_cmd_a
+
+######################################################################
+#
+#   create array of find roots
+#
+#   a bit primitive - theoretically should allow for escaped colons
+######################################################################
+set_find_root_a ()
+{
+    local ldir
+    local IFS=':'
+
+    for ldir in $1 ; do
+        if [ -d "$ldir" ] ; then
+            find_root_a[ ${#find_root_a[@]} ]="$ldir"
+        else
+            invalid_find_root_a[ ${#invalid_find_root_a[@]} ]="$ldir"
+        fi
+    done
+
+    IFS=$'\n'
+    find_root_a=($(
+        echo "${find_root_a[*]}" | perl -MFile::Spec -e '
+#select STDERR; $|++; print STDERR "got at start\n";
+            while (my $p = <>) {
+                chomp $p;
+                if (File::Spec->file_name_is_absolute($p)) {
+                    my $rel_p = File::Spec->abs2rel($p);
+                    $rel_p = File::Spec->join(q/./, $rel_p)
+                        unless $rel_p =~ /^\./;
+                    print length($p) < length($rel_p) ? $p : $rel_p;
+                }
+                else {
+                    print $p;
+                }
+             print $/;
+        }'
+    ))
+}
+
+######################################################################
+#
+#   create arrays of safe and forbidden applications
+#
+#   a bit primitive - theoretically should allow for escaped colons
+######################################################################
+set_safe_forbidden_a ()
+{
+    local app
+    local IFS=':'
+
+    for app in $WS_SAFE_CMD ; do
+        safe_cmd_a[ ${#safe_cmd_a[@]} ]="$app"
+    done
+
+    for app in $WS_FORBIDDEN_CMD ; do
+        forbidden_cmd_a[ ${#forbidden_cmd_a[@]} ]=`basename "$app"`
+    done
+}
+
+######################################################################
+#
+#  read config file
+#
+######################################################################
+if [ -r ~/.withsome-rc ] ; then
+    source ~/.withsome-rc
+fi
+
+
+######################################################################
+#
+#  if first arg is -- config just config
+#  --ls-all for bash completion
+#
+######################################################################
+declare -a found_args
+
+if [ "$1" == '--config' ] ; then
+    source $exec_path/withsome-util/withsome-cfg
+    exit
+elif [ "$1" == '--ls-all' ] ; then
+    cmd="ls"
+    found_args=('--sort=none' '-1')
+    ws_ls_all=1
+    shift  
+fi
+
+######################################################################
+# Need a directory - either first arg or cfgd.
+# Limited to one directory because of find ??? - expected enhance
+# suggestion cmd line one dir - cfg multiple
+######################################################################
+
+if [ "$1" ] && [ -d "$1" -o "$1" != "${1%%:*}" ] ; then
+    set_find_root_a "$1"
+fi
+
+if [ ${#find_root_a[@]} -gt 0 ] ; then
+    shift
+    if  [ ${#find_root_a[@]} -eq 1 ]    &&
+        type -t "${find_root_a[0]}" >/dev/null         &&
+        [ "${find_root_a[0]}" != "." ]
+    then
+        echo "'${find_root_a[0]}'" ambiguous - both directory and command 1>&2#
+    	exit 1
+    fi
+elif [ ! -z "$WS_FIND_ROOT" ] && [ "$WS_FIND_ROOT" != '-' ] ; then
+    set_find_root_a "$WS_FIND_ROOT"
+else
+	echo First argument should be a directory unless WS_FIND_ROOT set 2>&1
+	exit
+fi
+
+######################################################################
+# after - by self stop "finding" args as they are literal parameters
+######################################################################
+for arg in "$@" ; do
+    if [ $find_args_delimeter ] ; then
+        cmd="$arg"
+        break
+    fi
+
+    if [ "$arg" = '-' ] ; then
+	    find_args_delimeter=1
+	    collect_cmd_args "$@"
+    fi
+done
+
+# examples:
+#	wc
+#	wc -l
+#	- grep ^a
+
+######################################################################
+# unless delimiter cmd is now first arg
+# if delimeter - for now assume command after but should really check
+######################################################################
+if [ -z "$cmd" -a -z "$find_args_delimeter" ]
+then
+	cmd="$1"
+	shift
+fi
+
+set_safe_forbidden_a
+
+if [ "$cmd" ] ; then
+    declare cmd_basename=`basename $cmd`
+    for fcmd in "${forbidden_cmd_a[@]}" ; do
+        if [ "$cmd_basename" == "$fcmd" ] ; then
+            echo "command $cmd appears on forbidden list aborting ..." 1>&2
+            exit 1
+        fi
+    done
+fi
+
+if [ ! "$cmd" ] || [ ! `type -t "$cmd"` ] ; then
+    if [ "$cmd" ] ; then
+        echo Do not know how to execute "$cmd".  Note: aliases may not be visible        
+    else
+        echo could not find command on line
+    fi
+    exit
+fi
+
+
+for arg in "$@"
+do
+
+    # test for literal path
+    if [ 	"$arg" != "${arg#/}" 	-o \
+	     	"$arg" != "${arg#./}" 	-o \
+	     	"$arg" != "${arg#../}" 	]
+    then 
+        found_args[ ${#found_args[@]} ]="$arg"
+    elif [ "$arg" = '-' ] ; then
+        break
+    elif [ "$arg" != "${arg#-}" -a -z "$find_args_delimeter" ] ; then
+        echo ambiguous argument "'$arg'" starts with hypen '(-)'.  Consider findargs search_path file1 file2 ... - cmd -v --opt louder ... 1>&2
+        exit 1
+    else
+        was_search_for_argument=1
+        saveifs="$IFS"
+        IFS='
+'
+
+#       don't rush to optimize ... (`IFS="$saveifs";find_one_arg "$find_root" "$arg"`)
+        unset find_was_verified
+        for mat in `IFS="$saveifs";find_and_select "$arg"` ; do
+            if [ "$find_was_verified" ] ; then
+                found_args[ ${#found_args[@]} ]="$mat"
+            else
+                find_was_verified=$mat
+            fi
+        done
+
+        if [ $find_was_verified ] ; then
+            if [ $find_was_verified -eq 1 ] ; then
+                verified=$((verified + 1))            
+            else
+                unverified=$((unverified + 1))            
+            fi
+        fi
+    fi
+
+    IFS="$saveifs"
+done
+
+if [ "$was_search_for_argument" ] && [ ${#found_args[@]} -eq 0 ]
+then
+    if [ $verified -ge 1 ] ; then
+        echo "No arguments accepted from searches ... exiting ..." 1>&2
+    fi
+    exit 1
+fi
+
+declare safe_cmd
+for safe_cmd in "${safe_cmd_a[@]}" ; do
+    if [ "$cmd" == "$safe_cmd" ] ; then
+        unverified=0  # do not need verification for safe commands
+    fi
+done
+
+
+if [ "$find_args_delimeter" ] ; then
+#	echo echoing "${x_cmd_a[@]} ${found_args[@]}"
+#	exec "${x_cmd_a[@]}" "${found_args[@]}"
+#	exec "${x_cmd_a[@]} ${found_args[@]}"
+
+	if [ $unverified -ne 0 ] ; then
+        echo ${x_cmd_a[0]} "${x_cmd_a[@]:1}" "${found_args[@]}" 1>&2
+        if verify ; then unverified=0 ; fi
+    fi
+
+	if [ $unverified -eq 0 ] ; then
+        if [ `type -t "$cmd"` == 'function' ] ; then
+        	"${x_cmd_a[0]}" "${x_cmd_a[@]:1}" "${found_args[@]}"
+        else
+            # exec -a ??? other opts ??
+            exec "${x_cmd_a[0]}" "${x_cmd_a[@]:1}" "${found_args[@]}"
+        fi
+#    	$cmd "${x_cmd_a[@]:1}" "${found_args[@]:1}"
+    fi
+else
+    if [ $unverified -ne 0 ] ; then
+    	echo $cmd "${found_args[@]}" 1>&2
+        if verify ; then unverified=0 ; fi
+    fi
+
+    if [ $unverified -eq 0 ] ; then
+        if [ `type -t "$cmd"` == 'function' ] ; then
+        	"$cmd" "${found_args[@]}"
+        else
+            # exec -a ??? other opts ??
+            exec "$cmd" "${found_args[@]}"
+        fi
+    fi
+fi

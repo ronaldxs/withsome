@@ -1,0 +1,98 @@
+######################################################################
+#
+# Withsome command line completion.
+# Highly Experimental 
+#
+######################################################################
+
+export _wsc_idx=0
+export _wsc_search_item
+export _wsc_search_item_isok
+export _wsc_search_ws_results
+
+
+_wsc_fill_ws_results()
+{
+    local root_dir=''
+
+    if [ "$2" ] ; then
+        root_dir="$1"
+        shift
+    fi
+    
+    local s_item="$1"
+
+    local IFS='
+'
+    _wsc_search_ws_results=()
+    _wsc_idx=0
+#    echo root dir is $root_dir 1>&2
+#    echo search item is $s_item 1>&2
+
+    if ! type -t withsome > /dev/null ; then
+        echo 2>&1
+        echo Looks like withsome not on path 1>&2
+        return 1
+    fi
+
+    for ws_result in $(withsome --ls-all $root_dir $s_item)
+    do
+        _wsc_search_ws_results[ ${#_wsc_search_ws_results[@]} ]="$ws_result"
+    done
+
+    if [ ${#_wsc_search_ws_results[@]} -gt 0 ] ; then
+        _wsc_search_item_isok=1
+    else
+        unset _wsc_search_item_isok
+    fi
+
+    return 0
+}
+
+_wsc() 
+{
+    local cur prev opts cur_basename find_root
+    COMPREPLY=()
+    cur="${COMP_WORDS[COMP_CWORD]}"
+#    prev="${COMP_WORDS[COMP_CWORD-1]}"
+#    opts=("/mnt/fzzl/Pugs.pm" "/mnt/fzzl/twdl/Pugs.pm" "/help/me/rhonda/yeah/Pugs.pm")
+
+    if [ $COMP_CWORD -ge 1 ] ; then
+        eval "cur_basename=`basename '$cur'`"
+        if [ "$cur_basename" != "$_wsc_search_item" ] ; then
+            if [ $COMP_CWORD -ge 2 ] ; then
+                eval "find_root=${COMP_WORDS[1]}"
+            fi
+
+            if [ $find_root ] && [ -d "$find_root" -a $COMP_CWORD -eq 2 ] ; then
+                if type -t "${COMP_WORDS[2]}" >/dev/null; then return 1 ; fi
+            elif [ $COMP_CWORD -eq 1 ] && type -t "${COMP_WORDS[1]}" >/dev/null ; then
+                return 1
+            fi
+
+            if [ $find_root ] && [ -d "$find_root" ] ; then
+                if ! _wsc_fill_ws_results $find_root $cur_basename ; then
+                    return 1
+                fi
+            else
+                # hmm ... where do the error messages go ???
+                if ! _wsc_fill_ws_results $cur_basename ; then
+                    return 1
+                fi
+            fi
+        fi    
+    fi
+
+    if [ "$_wsc_search_item_isok" ] ; then
+        if [ $_wsc_idx -le ${#_wsc_search_ws_results} ] ; then
+            COMPREPLY=${_wsc_search_ws_results[ $_wsc_idx ]}
+            _wsc_idx=$((_wsc_idx +1))
+            return 0
+        else
+            return 1
+        fi
+    fi
+}
+#complete -o bashdefault -C ./lfoo foo3
+complete -o filenames -F _wsc wsc
+

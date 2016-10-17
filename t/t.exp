@@ -1,0 +1,634 @@
+#!/usr/bin/expect -f
+
+######################################################################
+#
+# expect test suite for withsome.  Currently 20-30 tests.
+# This is alpha software - PLEASE DO RUN THE TESTS -
+#
+# Ronald Schmidt
+# withsome Version/Version 0.10/0.15
+#
+######################################################################
+
+proc fail_test test_no_var {
+    upvar $test_no_var test_no
+    set old_test_no $test_no
+    incr test_no
+	error "fail test $old_test_no"
+    
+}
+
+proc to_fail_test test_no_var {
+    upvar $test_no_var test_no
+    puts "\n"
+    fail_test test_no
+}
+
+proc pass_test test_no_var {
+    upvar $test_no_var test_no
+    set old_test_no $test_no
+    incr test_no
+	error "ok test $old_test_no"
+}
+
+proc confirm_ok test_no_var {
+    upvar $test_no_var test_no
+    expect {
+	    -re         " - Empty.*"	{ send "\n" }
+	    eof		    { fail_test test_no }
+	    timeout		{ to_fail_test test_no }
+    }
+}
+
+
+cd ../bin
+set timeout 30
+# send "test3\n"
+#spawn ./withsome ../testdata wc Pugs.cabal
+
+
+#export WS_IGNORE=.svn:extra_test
+set env(WS_IGNORE) ".svn:extra_test"
+set env(WS_FIND_ROOT) "-"
+set env(WS_SAFE_CMD) "tail:ls"
+set env(WS_FORBIDDEN_CMD) "rm:unlink:/bin/outgrabe"
+# exec bash -c "export WS_FIND_ROOT"
+
+set test_no 1
+
+log_user 0
+
+puts "Should run approximately 25 tests:"
+
+# Test description: find a unique file
+catch {
+spawn ./withsome ../t/testdata/pugs wc Pugs.cabal
+confirm_ok test_no
+expect {
+    -re             " *23 *.*"  { pass_test test_no }
+    eof		        { fail_test test_no }
+    timeout		    { fail_test test_no }
+}
+
+} test_result
+
+puts $test_result
+close
+
+# Test description: find a file with a few instances
+#   and pick 2 out of more than 2
+catch {
+spawn ./withsome ../t/testdata/pugs wc Pugs.pm
+expect {
+ 	-re "Indicate.*"	{ send "3 5\n" }
+ 	eof		    { fail_test test_no }
+ 	timeout		{ to_fail_test test_no }
+}
+
+expect {
+    -re " *485 *.*"  { pass_test test_no }
+    eof		        { fail_test test_no }
+    timeout		    { fail_test test_no }
+}
+} test_result
+puts $test_result
+close
+
+cd ../t
+
+# Test description: find a file with a few instances,
+#   pick 2 out of more than 2 and start it from another
+#   directory to test ability to run sub programs from other dir.
+catch {
+spawn ../bin/withsome ../t/testdata/pugs wc Pugs.pm
+expect {
+ 	-re "Indicate.*"	{ send "3 5\n" }
+ 	eof		    { fail_test test_no }
+ 	timeout		{ to_fail_test test_no }
+}
+
+# confirm_ok test_no 
+
+expect {
+    -re " *485 *.*"  { pass_test test_no }
+    eof		        { fail_test test_no }
+    timeout		    { fail_test test_no }
+}
+
+} test_result
+
+puts $test_result
+close
+
+# Test description: handle file not found case
+catch {
+spawn ../bin/withsome ../t/testdata wc Pugsfizzle
+
+expect {
+    -re "No match found for.*"  { pass_test test_no }
+    eof		        { fail_test test_no }
+    timeout		    { fail_test test_no }
+}
+
+} test_result
+
+puts $test_result
+close
+
+# Test description: handle basic '-' delimiter for options case
+catch {
+spawn ../bin/withsome ../t/testdata/pugs Pugs.cabal - wc -l
+
+confirm_ok test_no
+expect {
+    -re             " *23 *"  { pass_test test_no }
+    eof		        { fail_test test_no }
+    timeout		    { fail_test test_no }
+}
+
+} test_result
+
+puts $test_result
+close
+
+# Test description: handle basic '-' delimiter for options case
+#   with menu selection of files
+catch {
+spawn ../bin/withsome ../t/testdata/pugs Pugs.pm - wc -l
+expect {
+ 	-re "Indicate.*"	{ send "3 5\n" }
+ 	eof		    { fail_test test_no }
+ 	timeout		{ to_fail_test test_no }
+}
+
+# confirm_ok test_no 
+
+expect {
+    -re " *485 *"  { pass_test test_no }
+    eof		        { fail_test test_no }
+    timeout		    { fail_test test_no }
+}
+
+} test_result
+
+puts $test_result
+close
+
+
+# Test description: safe command ls need no confirm_ok call
+catch {
+spawn ../bin/withsome ../t/testdata/pugs Pugs.cabal - ls -l
+
+expect {
+    -re             "-r.*Pugs.cabal"  { pass_test test_no }
+    eof		        { fail_test test_no }
+    timeout		    { fail_test test_no }
+}
+
+} test_result
+
+puts $test_result
+close
+
+# Test description: forbidden command should fail
+catch {
+spawn ../bin/withsome ../t/testdata/pugs outgrabe Pugs.pm
+
+expect {
+    -re             "command.*forbidden"  { pass_test test_no }
+    eof		        { fail_test test_no }
+    timeout		    { fail_test test_no }
+}
+
+} test_result
+
+puts $test_result
+close
+# Test description: forbidden command should fail based on basename
+catch {
+spawn ../bin/withsome ../t/testdata/pugs /bin/outgrabe Pugs.pm
+
+expect {
+    -re             "command.*forbidden"  { pass_test test_no }
+    eof		        { fail_test test_no }
+    timeout		    { fail_test test_no }
+}
+
+} test_result
+
+puts $test_result
+close
+
+
+# Test description: process a function as well as
+#   an executable file
+catch {
+spawn ../bin/withsome ../t/testdata/pugs wcl Pugs.pm
+expect {
+ 	-re "Indicate.*"	{ send "3 5\n" }
+ 	eof		    { fail_test test_no }
+ 	timeout		{ to_fail_test test_no }
+}
+
+expect {
+    -re " *485 *"  { pass_test test_no }
+    eof		        { fail_test test_no }
+    timeout		    { fail_test test_no }
+}
+
+} test_result
+
+puts $test_result
+close
+
+# Test description: try running non executable (could include alias)
+catch {
+spawn ../bin/withsome ../t/testdata/pugs wcnonesuch Pugs.pm
+
+expect {
+    -re "Do not know how to execute.*"  { pass_test test_no }
+    eof		        { fail_test test_no }
+    timeout		    { fail_test test_no }
+}
+
+} test_result
+
+puts $test_result
+close
+
+# Test description: try running without directory as first parm
+catch {
+spawn ../bin/withsome ../t/testdata/nosuchsubdir wc Pugs.pm
+
+expect {
+    -re "First argument should be a directory.*"  { pass_test test_no }
+    eof		        { fail_test test_no }
+    timeout		    { fail_test test_no }
+}
+
+
+} test_result
+
+puts $test_result
+close
+
+# Test description: try running without directory as first parm
+#   but set find root through env
+set env(WS_FIND_ROOT) "../t/testdata/pugs"
+
+catch {
+spawn ../bin/withsome ../t/testdata/pugs Pugs.pm - wc -l
+expect {
+ 	-re "Indicate.*"	{ send "3 5\n" }
+ 	eof		    { fail_test test_no }
+ 	timeout		{ to_fail_test test_no }
+}
+
+expect {
+    -re " *485 *"  { pass_test test_no }
+    eof		        { fail_test test_no }
+    timeout		    { fail_test test_no }
+}
+
+} test_result
+
+puts $test_result
+close
+
+catch {
+spawn ../bin/withsome ../t/testdata/mnt Pugs.pm - wc -l
+
+expect {
+    -re "No match found for.*"  { pass_test test_no }
+    eof		        { fail_test test_no }
+    timeout		    { fail_test test_no }
+}
+
+} test_result
+
+puts $test_result
+close
+
+set env(WS_FIND_ROOT) ""
+
+
+# Test description: test with more than one file name
+#   in this case a name with a unique instance and
+#   a name with multiple instances
+catch {
+spawn ../bin/withsome ../t/testdata/pugs wc Pugs.pm Pugs.cabal
+expect {
+ 	-re "Indicate.*"	{ send "3 5\n" }
+ 	eof		    { fail_test test_no }
+ 	timeout		{ to_fail_test test_no }
+}
+
+confirm_ok test_no 
+
+expect {
+    -re " *508 *"  { pass_test test_no }
+    eof		        { fail_test test_no }
+    timeout		    { fail_test test_no }
+}
+
+} test_result
+
+puts $test_result
+close
+
+# Test description: test with more than one file name
+#   in this case a name with a unique instance specd twice
+catch {
+spawn ../bin/withsome ../t/testdata/pugs wc Pugs.cabal Pugs.cabal
+
+confirm_ok test_no 
+
+expect {
+    -re " *46 *"  { pass_test test_no }
+    eof		        { fail_test test_no }
+    timeout		    { fail_test test_no }
+}
+
+} test_result
+
+puts $test_result
+close
+
+# Test description: test with more than one file name
+#   in this case a name with multiple instances specd twice
+catch {
+spawn ../bin/withsome ../t/testdata/pugs wc Pugs.pm Pugs.pm
+
+expect {
+ 	-re "Indicate.*"	{ send "3 5\n" }
+ 	eof		    { fail_test test_no }
+ 	timeout		{ to_fail_test test_no }
+}
+
+expect {
+ 	-re "Indicate.*"	{ send "2\n" }
+ 	eof		    { fail_test test_no }
+ 	timeout		{ to_fail_test test_no }
+}
+
+expect {
+    -re " *585 *"  { pass_test test_no }
+    eof		        { fail_test test_no }
+    timeout		    { fail_test test_no }
+}
+
+
+} test_result
+
+puts $test_result
+close
+
+# Test description: test with more than one file name
+#   against a function
+catch {
+spawn ../bin/withsome ../t/testdata/pugs wcl Pugs.pm Pugs.cabal
+expect {
+ 	-re "Indicate.*"	{ send "3 5\n" }
+ 	eof		    { fail_test test_no }
+ 	timeout		{ to_fail_test test_no }
+}
+
+confirm_ok test_no 
+
+expect {
+    -re " *508 *"  { pass_test test_no }
+    eof		        { fail_test test_no }
+    timeout		    { fail_test test_no }
+}
+
+} test_result
+
+puts $test_result
+close
+
+# Test description: handle wildcard as well as
+#   handle basic '-' delimiter for options case
+catch {
+spawn ../bin/withsome ../t/testdata/pugs wc *.cabal
+
+confirm_ok test_no
+expect {
+    -re             " *23 *.*"  { pass_test test_no }
+    eof		        { fail_test test_no }
+    timeout		    { fail_test test_no }
+}
+
+} test_result
+
+puts $test_result
+close
+
+# Test description: Subversion pruning in docs
+catch {
+spawn ../bin/withsome ../t/testdata/pugs/docs wc 01Over*
+
+expect {
+ 	-re "Indicate.*"	{ send "1 3\n" }
+ 	eof		    { fail_test test_no }
+ 	timeout		{ to_fail_test test_no }
+}
+
+expect {
+    -re             " *776 *.*"  { pass_test test_no }
+    eof		        { fail_test test_no }
+    timeout		    { fail_test test_no }
+}
+
+} test_result
+
+puts $test_result
+close
+
+set env(WS_FOLLOW) "none"
+# Test description: soft link fail test and test of menu selection
+#   out of range
+catch {
+spawn ../bin/withsome ../t/testdata/pugs wc Pugs.pm
+
+expect {
+ 	-re "Indicate.*"	{ send "1 3 6\n" }
+ 	eof		    { fail_test test_no }
+ 	timeout		{ to_fail_test test_no }
+}
+
+expect {
+    -re             ".*was not a number between*.*"  {
+        pass_test test_no
+        send "0\n"
+    }
+    eof		        { fail_test test_no }
+    timeout		    { fail_test test_no }
+}
+
+} test_result
+
+puts $test_result
+close
+
+set env(WS_FOLLOW) "links"
+# Test description: soft link fail test and test of menu selection
+#   out of range
+catch {
+spawn ../bin/withsome ../t/testdata/pugs wc Pugs.pm
+
+expect {
+ 	-re "Indicate.*"	{ send "1 3 6\n" }
+ 	eof		    { fail_test test_no }
+ 	timeout		{ to_fail_test test_no }
+}
+
+expect {
+    -re             " *375 *.*"  { pass_test test_no }
+    eof		        { fail_test test_no }
+    timeout		    { fail_test test_no }
+}
+
+} test_result
+
+puts $test_result
+close
+
+# Test description: find a file with a few instances
+#   and pick 2 out of more than 2 twice for two roots
+catch {
+spawn ../bin/withsome ../t/testdata/pugs:../t/testdata/pugs2 wc Pugs.pm
+expect {
+ 	-re "Indicate.*"	{ send "5 7 8 10\n" }
+ 	eof		    { fail_test test_no }
+ 	timeout		{ to_fail_test test_no }
+}
+
+#expect {
+# 	-re "Indicate.*"	{ send "3 5\n" }
+# 	eof		    { fail_test test_no }
+# 	timeout		{ to_fail_test test_no }
+#}
+
+expect {
+    -re " *970 *.*"  { pass_test test_no }
+    eof		        { fail_test test_no }
+    timeout		    { fail_test test_no }
+}
+} test_result
+puts $test_result
+close
+
+# space in search path
+catch {
+spawn ../bin/withsome "../t/testdata/pugs 2" wc Pugsy.cabal
+expect {
+    -re         " - Empty.*"	{ send "\n" }
+ 	eof		    { fail_test test_no }
+ 	timeout		{ to_fail_test test_no }
+}
+
+expect {
+    -re " 23 *.*"   { pass_test test_no }
+    eof		        { fail_test test_no }
+    timeout		    { fail_test test_no }
+}
+} test_result
+puts $test_result
+close
+
+# space in search path and executed program
+catch {
+spawn ../bin/withsome "../t/testdata/pugs 2" "../t/bin/word count.sh" Pugsy.cabal
+expect {
+    -re         " - Empty.*"	{ send "\n" }
+ 	eof		    { fail_test test_no }
+ 	timeout		{ to_fail_test test_no }
+}
+
+expect {
+    -re " 23 *.*"   { pass_test test_no }
+    eof		        { fail_test test_no }
+    timeout		    { fail_test test_no }
+}
+} test_result
+puts $test_result
+close
+
+# handle Perl module format ACME::Net::Null
+catch {
+spawn ../bin/withsome ../t/testdata wc Inline::Pugs
+expect {
+ 	-re "Indicate.*"	{ send "1 4\n" }
+ 	eof		    { fail_test test_no }
+ 	timeout		{ to_fail_test test_no }
+}
+
+expect {
+    -re ".* 6190 total"  { pass_test test_no }
+    eof		        { fail_test test_no }
+    timeout		    { fail_test test_no }
+}
+} test_result
+puts $test_result
+close
+set ftp_mount 0
+
+if { [ catch {exec mount | fgrep "testdata/mnt/direct_sunet"} ] != 0 } {
+   	set have_curlftpfs [ catch { exec which curlftpfs } ]
+    if { $have_curlftpfs == 0 } {
+        puts "trying to create test ftp mount point ..."
+        if { [ catch { exec sudo curlftpfs -o allow_other ftp://ftp.sunet.se/pub/www/doc ../t/testdata/mnt/direct_sunet/ } ] == 0 } {
+    		set ftp_mount 1
+        }
+    }
+} else {
+   	set ftp_mount 1
+}
+
+if { $ftp_mount == 1 } {
+
+set env(WS_FOLLOW) "none"
+# Test description: handle file not found case
+catch {
+spawn bash -c "../bin/withsome ../t/testdata/ zcat *-HTML.txt.gz | wc -l"
+
+expect {
+    -re "No match found for.*"  { pass_test test_no }
+    eof		        { fail_test test_no }
+    timeout		    { fail_test test_no }
+}
+
+} test_result
+
+puts $test_result
+close
+
+set env(WS_FOLLOW) "all"
+# Test description: handle file not found case
+catch {
+spawn bash -c "../bin/withsome ../t/testdata/  *-HTML.txt.gz Pugs.pm - zcat -f | wc -l"
+
+expect {
+ 	-re "Indicate.*"	{ send "1 3 6\n" }
+ 	eof		    { fail_test test_no }
+ 	timeout		{ to_fail_test test_no }
+}
+
+confirm_ok test_no 
+
+expect {
+    -re             " *7654 *.*"  { pass_test test_no }
+    eof		        { fail_test test_no }
+    timeout		    { fail_test test_no }
+}
+
+} test_result
+
+puts $test_result
+close
+
+} else {
+	puts "Skipped last two tests."
+}
+
+puts "all done"

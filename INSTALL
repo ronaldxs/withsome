@@ -1,0 +1,15 @@
+To install this script just place the entire content of the bin
+directory, including the withsome-util subdirectory and its files, on
+your path. Either modify your path with something like:
+
+export PATH=$PATH:~/withsome/bin
+
+or copy the content with a command like
+
+cp -r /home/my_account_home/withsome/bin/* /usr/local/something_on_my_path/
+
+That's it!
+
+Don't forget to run the included tests BEFORE installing by running
+t/t.sh. The last two tests have many requirements, including sudo, as
+well as pre-requisites so don't worry if those two don't run.

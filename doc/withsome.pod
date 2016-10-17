@@ -1,0 +1,150 @@
+=pod
+
+=head1 NAME
+
+withsome - with some file name run a command on matching nearby files
+
+Version 0.19
+
+=head1 SYNOPSIS
+
+withsome [I<DIRECTORY>] I<COMMAND> I<FILE> [I<FILE>] ...
+
+withsome [I<DIRECTORY>] I<COMMAND> I<Perl::Module> [I<FILE>] ...
+
+withsome [I<DIRECTORY>] I<FILE> [I<FILE>] ... I<-> I<COMMAND> [I<OPTION>] ...
+
+=head1 DESCRIPTION
+
+Find all files with a provided name or glob under one or more directories and allow a user to run a command against any matching instances of the name, or glob, through interactive menus and prompts.  A little similar to zsh recursive wildcards or a combination of find, xargs (and maybe select) but designed to be friendlier, safer, and provide better user interaction than either and works with bash.  If a menu of matching files needs to presented for file selection the files will be sorted to present paths with the fewest elements first and then sort paths of identical length in elements alphabetically.  See examples below.
+
+=head1 EXAMPLES
+
+
+=head2 Example 1: case of one file matching on explicit root
+
+ withsome ~/pugs view eval.pl
+ view /home/ron/pugs/examples/eval.pl
+  - Empty reply accepts, anything else aborts (help for explanation)? 
+ (pressing enter runs view on /home/someone/pugs/examples/eval.pl)
+
+
+=head2 Example 2: case of a few files matching on explicit root
+
+ withsome ~/pugs vi Pugs.pm
+ 1) /home/ron/pugs/lib/Inline/Pugs.pm
+ 2) /home/ron/pugs/lib/Perl6/Pugs.pm
+ 3) /home/ron/pugs/blib/lib/Inline/Pugs.pm
+ 4) /home/ron/pugs/blib/lib/Perl6/Pugs.pm
+ 5) /home/ron/pugs/inc/Module/Install/Pugs.pm
+ A) * All of the above
+ Indicate your selection(s) from the above or 0 for none (default 1): 1 4
+ (    giving 1 and 4 as inputs and pressing enter runs vi on:
+          /home/ron/pugs/lib/Inline/Pugs.pm
+          /home/ron/pugs/blib/lib/Perl6/Pugs.pm                  )
+
+
+=head2 Example 3: case of one file matching and pre-configured root
+
+ withsome wc eval.pl
+ wc /home/ron/pugs/examples/eval.pl
+  - Empty reply accepts, anything else aborts (help for explanation)? 
+   83  269 2016 /home/ron/pugs/examples/eval.pl
+
+=head3 Example omitted for brevity: analogous case of a few matching files and pre-configured root
+
+=head2 Example 4: search for Perl(ish) module
+
+ withsome ~/pugs vi Inline::Pugs
+ 1) ../t/testdata/pugs/lib/Inline/Pugs.pm
+ 2) ../t/testdata/pugs/blib/lib/Inline/Pugs.pm
+ A) * All of the above
+ Indicate your selection(s) from the above or 0 for none (default 1):
+
+=head2 Example 5: case of a few files matching on explicit root with hyphen (-) prefix option(s)
+
+ withsome ~/pugs Pugs.pm - wc -l
+ 1) /home/ron/pugs/lib/Inline/Pugs.pm
+ 2) /home/ron/pugs/lib/Perl6/Pugs.pm
+ 3) /home/ron/pugs/blib/lib/Inline/Pugs.pm
+ 4) /home/ron/pugs/blib/lib/Perl6/Pugs.pm
+ 5) /home/ron/pugs/inc/Module/Install/Pugs.pm
+ A) * All of the above
+ Indicate your selection(s) from the above or 0 for none (default 1): 1 4
+  125 /home/ron/pugs/lib/Inline/Pugs.pm
+  100 /home/ron/pugs/blib/lib/Perl6/Pugs.pm
+  225 total
+
+=head1 Configuration
+
+The withsome utility has configuration options that can be controlled through environment variables as listed below.  The variables can also be set in a S<.withsome-rc> file in your home directory.  Note that if you have the dialog/cdialog package installed, the command C<withsome --config> will allow you to configure the environment options in the S<.withsome-rc> file through interactive dialogs and menus.
+
+=over
+
+=item WS_FIND_ROOT
+
+Root of search path for file names and globs.  May also be colon separated list of such search path roots.
+
+=item WS_IGNORE 
+
+Colon separated list of prune directory or other file system names to be used as prune arguments to find.
+
+=item WS_FOLLOW 
+
+Configures following or pruning through directories that represent links or mount points.  The default is to follow neither.  The value settings of link/links, mount points, and all respectively instruct withsome to follow links, mount points or both in its finds/searches.
+
+=item WS_SAFE_CMD 
+
+Colon separated list of commands that can be run without prior prompting when exactly one match is found. Commands like ls and wc make good candidates.
+
+=item WS_FORBIDDEN_CMD 
+
+Colon separated list of commands that should never be run from withsome.  The rm command might be a good candidate here.  Note that basename matching is used here so that precluding rm will also preclude /bin/rm/ and /usr/bin/rm.
+
+=back
+
+=head1 CAVEATS
+
+This is alpha software - use at your own risk.
+
+=head1 REQUIREMENTS
+
+A reasonably recent (>2.X) version of bash and nearly any perl.  The perl requirement might be lifted at some point.
+
+=head1 INSTALLATION 
+
+To install this script just place the entire content of the bin
+directory, including the withsome-util subdirectory and its files,
+on your path.  Either modify your path with something like:
+
+export PATH=$PATH:~/withsome/bin
+
+or copy the content with a command like
+
+S<cp -r /home/my_account_home/withsome/bin/* /usr/local/something_on_my_path/>
+
+That's it!
+
+Don't forget to run the included tests BEFORE installing by running t/t.sh.
+The last two tests have many requirements, including sudo, as well as
+pre-requisites so don't worry if those two don't run.
+
+=head1 COPYRIGHT and Licensing.
+
+Copyright (C) 2007-2016  Ronald Schmidt 
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+
+=cut

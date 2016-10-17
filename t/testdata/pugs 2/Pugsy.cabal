@@ -1,0 +1,23 @@
+name: Pugs
+version: 6.2.13
+license: GPL
+license-file: LICENSE
+copyright: 2005-2007, The Pugs Contributors
+maintainer: Audrey Tang <audreyt@audreyt.org>
+build-depends: pugs-hsregex -any, pugs-HsSyck -any, filepath -any, base -any, mtl -any, stm -any, parsec -any, network -any, haskell98 -any, template-haskell -any, time -any, unix -any, readline -any
+stability: experimental
+homepage: http://pugscode.org/
+synopsis: A Perl 6 Implementation
+description: A Perl 6 Implementation
+author: Audrey Tang <audreyt@audreyt.org>
+tested-with: GHC -any
+exposed-modules: Pugs Pugs.AST Pugs.AST.Internals Pugs.AST.Internals.Instances Pugs.AST.Pad Pugs.AST.Pos Pugs.AST.Prag Pugs.AST.SIO Pugs.AST.Scope Pugs.AST.Utils Pugs.AST.Eval Pugs.Bind Pugs.Class.C3 Pugs.Class Pugs.CodeGen Pugs.CodeGen.JSON Pugs.CodeGen.PIL1 Pugs.CodeGen.PIR Pugs.CodeGen.PIR.Prelude Pugs.Prelude Pugs.CodeGen.Perl5 Pugs.CodeGen.YAML Pugs.Compat Pugs.Compile Pugs.Compile.Pugs Pugs.Config Pugs.Cont Pugs.DeepSeq Pugs.Embed Pugs.Embed.Haskell Pugs.Embed.Parrot Pugs.Embed.Perl5 Pugs.Embed.Pugs Pugs.Eval Pugs.Eval.Var Pugs.External Pugs.External.Haskell Pugs.Help Pugs.Internals Pugs.Internals.Cast Pugs.Internals.ID Pugs.Internals.String Pugs.Internals.Global Pugs.Internals.Monads Pugs.Junc Pugs.Lexer Pugs.Meta Pugs.Meta.Class Pugs.Meta.Str Pugs.Meta.Perl5 Pugs.Monads Pugs.PIL1 Pugs.PIL1.Instances Pugs.Parser Pugs.Parser.Charnames Pugs.Parser.Operator Pugs.Parser.Number Pugs.Parser.Program Pugs.Parser.Types Pugs.Parser.Unsafe Pugs.Parser.Export Pugs.Parser.Doc Pugs.Parser.Literal Pugs.Parser.Util Pugs.Pretty Pugs.Prim Pugs.Prim.Code Pugs.Prim.Eval Pugs.Prim.FileTest Pugs.Prim.Keyed Pugs.Prim.Lifts Pugs.Prim.List Pugs.Prim.Match Pugs.Prim.Numeric Pugs.Prim.Param Pugs.Prim.Yaml Pugs.Rule Pugs.Run Pugs.Run.Args Pugs.Run.Perl5 Pugs.Shell Pugs.Types Pugs.Version Emit.Common Emit.PIR Emit.PIR.Instances Pugs.Val Pugs.Val.Capture Pugs.Val.Code Pugs.Val.Base Pugs.Exp MO.Util MO.Base MO.Compile MO.Run MO.Compile.Attribute MO.Compile.Role MO.Compile.Class
+buildable: True
+c-sources: src/perl5/p5embed.c
+hs-source-dirs: src
+extra-libraries: 
+extra-lib-dirs: /usr/local/lib /usr/lib/perl/5.8/CORE
+extensions: ForeignFunctionInterface
+include-dirs: /usr/local/include /usr/lib/perl/5.8/CORE
+other-modules: Data.DeepSeq DrIFT.JSON DrIFT.Perl5 DrIFT.Perl6Class DrIFT.YAML UTF8
+ghc-options: --make -O -threaded -H0 -static -fno-warn-name-shadowing -DPUGS_HAVE_READLINE -DPUGS_HAVE_PERL5 -isrc/perl5 -optc-D_REENTRANT -optc-D_GNU_SOURCE -optc-DTHREADS_HAVE_PIDS -optc-DDEBIAN -optc-fno-strict-aliasing -optc-pipe -optc-I/usr/local/include -optc-D_LARGEFILE_SOURCE -optc-D_FILE_OFFSET_BITS=64 -optc-I/usr/lib/perl/5.8/CORE -optl-Wl,-E -optl-L/usr/local/lib -optl/usr/lib/perl/5.8/auto/DynaLoader/DynaLoader.a -optl-L/usr/lib/perl/5.8/CORE -optl-lperl -optl-ldl -optl-lm -optl-lpthread -optl-lc -optl-lcrypt -D_REENTRANT -D_GNU_SOURCE -DTHREADS_HAVE_PIDS -DDEBIAN -I/usr/local/include -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 -I/usr/lib/perl/5.8/CORE -L/usr/local/lib -L/usr/lib/perl/5.8/CORE

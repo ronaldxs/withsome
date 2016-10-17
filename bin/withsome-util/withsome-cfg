@@ -1,0 +1,170 @@
+
+escape_quote_space ()
+{
+#    echo "$@" | sed 's/[;'"'"'" ]/\\&/g' # was before
+    echo "$@" | sed 's/['"'"'" ]/\\&/g'
+}
+
+# for the time being can source here
+# idea : source old cfg file.  source new cfg file.  write vars to old cfg file
+
+write_new_config ()
+{
+local fname="$1"
+local -i first_time=1
+local -i dialog_rc=0
+local sv_IFS= $IFS
+local IFS=':'
+local ws_find_root_a=($WS_FIND_ROOT)
+IFS=$sv_IFS
+local -i find_root_idx=0
+local start_dir
+
+while   [ $first_time ] ||
+    ( [ $dialog_rc -eq 0 ] && dialog --yesno "Additional find root" 0 0 )
+do
+if [ "$first_time" ] ; then
+    echo -n '' >$fname
+    unset first_time
+else
+    echo -n ':' >>$fname
+fi
+
+# might think about forcing transitions to next find root element
+if [ $find_root_idx -lt ${#ws_find_root_a[@]} ] ; then
+    start_dir=${ws_find_root_a[$find_root_idx]}
+    find_root_idx=$((find_root_idx + 1))
+else
+    start_dir=`pwd`
+fi
+
+dialog --title ' * Find root / WS_FIND_ROOT * '\
+    --extra-button --extra-label "OK done"\
+    --dselect $start_dir 0 60 2>>$fname
+dialog_rc=$?
+done
+echo >>$fname
+# don't really have $? here but do have $dialog_rc
+
+if [ $dialog_rc -ne 0 ] ; then return $dialog_rc ; fi
+
+# add dialog describing roots if multiple
+
+(
+dialog --extra-button --extra-label "OK done"\
+    --title "WS_IGNORE"\
+    --inputbox "prune directories for find (: separated)"\
+    10 60 "$WS_IGNORE"
+dialog_rc_l=$?
+echo 1>&2
+exit $dialog_rc_l
+) 2>>$fname
+dialog_rc=$?
+if [ $dialog_rc -ne 0 ] ; then return $dialog_rc ; fi
+
+# echo final rc $dialog_rc
+# --extra-button --extra-label "Another root..."
+local follow_default='none'
+if [ "$WS_FOLLOW" ] ; then
+    follow_default="$WS_FOLLOW"
+fi
+
+(
+dialog --extra-button --extra-label "OK done"\
+    --title "WS_FOLLOW"\
+    --default-item $follow_default\
+    --menu 'Find follow options' 0 40 0\
+    'none' ''  links '' 'mount points' '' 'all' ''
+dialog_rc_l=$?
+echo 1>&2
+exit $dialog_rc_l
+) 2>>$fname
+dialog_rc=$?
+if [ $dialog_rc -ne 0 ] ; then return $dialog_rc ; fi
+
+# echo final rc $?
+(
+dialog --extra-button --extra-label "OK done"\
+    --title "WS_SAFE_CMD"\
+    --inputbox "Commands presumed safe (: separated)"\
+    10 60 "$WS_SAFE_CMD"
+dialog_rc_l=$?
+echo 1>&2
+exit $dialog_rc_l
+) 2>>$fname
+dialog_rc=$?
+if [ $dialog_rc -ne 0 ] ; then return $dialog_rc ; fi
+
+(
+dialog --extra-button --extra-label "OK done"\
+    --title "WS_FORBIDDEN_CMD"\
+    --inputbox "Commands NOT to be run against uncertain targets (: separated)"\
+    10 60 "$WS_FORBIDDEN_CMD"
+dialog_rc_l=$?
+echo 1>&2
+exit $dialog_rc_l
+) 2>>$fname
+dialog_rc=$?
+
+return $dialog_rc
+}
+
+
+# 0 all ok, 3 early finish, 1 or 255 cancel
+
+unset WS_FIND_ROOT
+unset WS_IGNORE
+unset WS_FOLLOW
+unset WS_SAFE_CMD
+unset WS_FORBIDDEN_CMD
+
+# should revise this to ignore environment overrides ...
+if [ -f ~/.withsome-rc ] ; then
+    source ~/.withsome-rc
+#    echo $WS_FIND_ROOT
+#    exit
+fi
+
+cfg_lines_f="/tmp/.withsome-rc.$"
+write_new_config "$cfg_lines_f"
+rc=$?
+# echo final return code was $rc
+
+if [ $rc -eq 0 -o $rc -eq 3 ] ; then
+    rc_pre_final=/tmp/.withsome.rc.final.$$
+
+    if [ -f $rc_pre_final ] ; then
+        rm $rc_pre_final
+    fi
+    for ws_var in WS_FIND_ROOT WS_IGNORE WS_FOLLOW WS_SAFE_CMD WS_FORBIDDEN_CMD
+    do
+        read ws_val
+        ws_val=$(escape_quote_space "$ws_val")
+#        echo ws_val is "$ws_val"
+        echo "if [ -z \"\$$ws_var\" ] ; then" >>$rc_pre_final
+        echo -n "   export $ws_var=" >>$rc_pre_final
+        eval "export $ws_var=$ws_val; escape_quote_space \"\$$ws_var\" >>$rc_pre_final"
+        echo "fi" >>$rc_pre_final
+    done < $cfg_lines_f
+
+    # need more sophistacated return code /error handling
+
+#    echo -n "export WS_FIND_ROOT=" >$rc_pre_final
+#    escape_quote_space "$WS_FIND_ROOT" >>$rc_pre_final
+#    echo -n "export WS_IGNORE=" >>$rc_pre_final
+#    escape_quote_space "$WS_IGNORE" >>$rc_pre_final
+#    echo -n "export WS_FOLLOW=" >>$rc_pre_final
+#    escape_quote_space "$WS_FOLLOW" >>$rc_pre_final
+
+    mv $rc_pre_final ~/.withsome-rc
+    echo '***' config is now '***'
+    echo
+    cat ~/.withsome-rc
+fi
+#cat $cfg_lines_f
+
+if [ -f $cfg_lines_f ] ; then
+    rm $cfg_lines_f
+fi
+
+
