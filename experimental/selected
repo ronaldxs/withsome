@@ -1,0 +1,181 @@
+#!/bin/bash
+
+: <<'END_OF_DOCS'
+
+=head1 NAME
+
+selected - a text filter extension of select that allows
+multiple selections
+
+=head1 SYNOPSIS
+
+ $ selected giggle gaggle bargle waggle
+ 1) giggle
+ 2) gaggle
+ 3) bargle
+ 4) waggle
+ #? 2 3
+ gaggle
+ bargle
+
+=head2 Switches
+
+=over
+
+=item B<-a>
+
+Get list of menu items as lines of file or subprocess
+specified by -a option.  Since menu selections are read
+from stdin the command
+
+ ls -1 | xargs selected
+
+doesn't do what you expect.  Menu selection tries to read
+from the closed pipe and no menu item is selected.  Instead do:
+
+ selected -a<(ls -1)
+
+to get the menu from the output of the ls command (or some other).
+Menu items are separated by end of line to allow embedded horizontal
+space.
+
+=item B<-s>
+
+Sort output in menu order.  By default selections are output in the
+order specified by the item numbers provided at the prompt.  This option
+specifies that selected items are output in the same order as items
+in the menu.
+
+=item B<-u>
+
+Require that item selections be unique.  Prints an error and presents
+the menu again if an item is selected more than once.  By default
+the same item can be selected more than once.
+
+=item B<-x>
+
+Allow selected to run under xargs.  As explained with the B<-a> option,
+running selected the usual way with xargs doesn't work since the menu
+selection is read from stdin which is being used by xargs.  If, for
+some reason, you must use xargs try
+
+ echo 2 | xargs -a<(ls -1) -d$'\n' selected -x
+
+and now xargs reads the arguments that become menu selections from `ls`
+and selected reads the menu selection from the pipe.  This should rarely
+be needed and the B<-a> option of selected is more likely to provide a
+good solution to menu options from a program or file.
+
+=back
+
+=cut
+
+END_OF_DOCS
+
+# echo in order selected or in order of menu option
+# reject duplicates option - (uniq program ?)
+
+_selected () {
+    local dummy choice i
+    local -a selected_choices
+
+    select dummy in "$@"; do  # present numbered choices to user
+# Parse ,-separated numbers entered into an array.
+# Variable $REPLY contains whatever the user entered.
+        IFS=', ' read -ra selected_choices <<<"$REPLY"
+# Loop over all numbers entered.
+        for choice in "${selected_choices[@]}"; do
+
+# hack to force easier termination
+            if [ "$choice" = 'quit' ]
+            then
+                return
+            fi
+
+            # Validate the number entered.
+            # reject non natural numbers
+            if [ -n "${choice//[0-9]}" ] || ! (( choice >= 1 && choice <= $# ))
+            then 
+                echo "Invalid choice: $choice. Try again." >&2
+                continue 2 # ==> continue to select
+            fi
+        done
+
+        if [[ ${is_unique##0} ]] ; then
+            IFS=$'\n'
+            unique_choices=($(printf '%s\n' "${selected_choices[*]}" | sort -un))
+            if (( ${#unique_choices[@]} < ${#selected_choices[@]} )) ; then
+                echo "Choice selected more than once with unique option enabled." >&2
+                continue 2 # ==> continue to select
+            fi
+        fi
+
+        if [[ ${is_menu_sort##0} ]] ; then
+            if [[ ${is_unique##0} ]] ; then
+                selected_choices=("${unique_choices[@]}")
+            else
+                IFS=$'\n'
+                selected_choices=( \
+                    $(printf '%s\n' "${selected_choices[*]}" | sort -n) \
+                )
+            fi
+        fi
+
+        for choice in "${selected_choices[@]}"; do
+# If valid, echo the choice and its number.
+#            echo "Choice #$(( ++i )): ${!choice} ($choice)"
+            echo "${!choice}"
+        done
+# All choices are valid, exit the prompt.
+        break
+    done
+}
+
+selected() {
+    local is_menu_sort is_unique is_xargs is_infile parent_prog_name
+    local OPTIND opt dummy old_ifs="${IFS}"
+    local -a menu_opts ps_fields
+
+    while getopts a:sux opt; do
+        case $opt in
+            a)  is_infile=1
+                IFS=$'\n'
+                menu_opts=($(cat $OPTARG))
+                IFS="${old_ifs}"
+                shift $((OPTIND-1))
+                 _selected "${menu_opts[@]}"
+                ;;
+            s)  is_menu_sort=1
+                shift $((OPTIND-1))
+                ;;
+            u)  is_unique=1
+                shift $((OPTIND-1))
+                ;;
+            x)  is_xargs=1
+                shift $((OPTIND-1))
+                ;;
+        esac
+    done
+
+    # STDIN not from terminal - might be cleverer check
+    if ! ((is_infile)) && ! [ -t 0 ] ; then
+        if ! (($#)) ; then
+            echo 'Reading both menu and selections from same(?) file or pipe unlikely to work' 1>&2
+            echo 'For auto generated menu options consider -a option'
+            return 2
+        elif ! ((is_xargs)) ; then
+            parent_prog_name=$(ps -s -p $PPID | (\
+                read dummy
+                read -a ps_fields
+                basename "${ps_fields[-1]}" ))
+            if [ "$parent_prog_name" = 'xargs' ] ; then
+                echo 'Running under xargs with input from file or pipe a bit tricky.' 1>&2
+                echo 'Please use -x option and read explanation in documentation of option.' 1>&2
+                return 3
+            fi 
+        fi
+    fi
+
+     _selected "$@"
+}
+
