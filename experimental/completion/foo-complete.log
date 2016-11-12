@@ -1,0 +1,25 @@
+Fri, Oct 28, 2016  1:06:57 PM
+cur is , -
+COMPREPLY is , --help
+Fri, Oct 28, 2016  1:06:58 PM
+cur is , --
+COMPREPLY is , --help
+Fri, Oct 28, 2016  1:07:00 PM
+cur is , --
+COMPREPLY is , --help
+Fri, Oct 28, 2016  1:09:23 PM
+cur is , --ve
+COMPREPLY is , --verbose
+Fri, Oct 28, 2016  1:10:27 PM
+cur is --ve
+COMPREPLY is , --verbose
+Fri, Oct 28, 2016  1:11:01 PM
+cur is "abc def"
+Fri, Oct 28, 2016  1:11:02 PM
+cur is "abc def"
+Fri, Oct 28, 2016  1:11:03 PM
+cur is "abc def"
+Fri, Oct 28, 2016  1:11:03 PM
+cur is "abc def"
+Fri, Oct 28, 2016  1:30:57 PM
+cur is 
