@@ -1,5 +1,5 @@
 #!/bin/bash
 
-source ../selected
+source $(dirname "$SCRIPT")/selected
 
 selected "$@"

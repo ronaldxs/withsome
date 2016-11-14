@@ -13,14 +13,14 @@ use Shell::Bash::Selected::UnitTest::Common qw(:all);
 
 test_menu_to_five(
     'select five and two from menu with -s', "5 2\n",
-    qr/^ two \r? $ \v? ^ five \r? $/xsmi,
+    qr/^ two \r? $ \v? ^ five \r? $/xmi,
     'selected menu items two and five',
     {optarg => '-s'}
 );
 
 test_menu_to_five(
     'select five and two from menu with -u', "5 2\n",
-    qr/^ five \r? $ \v? ^ two \r? $/xsmi, 
+    qr/^ five \r? $ \v? ^ two \r? $/xmi, 
     'selected menu items two and five',
     {optarg => '-u'}
 );
@@ -39,7 +39,7 @@ subtest 'select five (twice) and two from menu with -u', sub {
     $exp->send("5 2 5\n");
     is( $pat_idx = $exp->expect(
             $SHELL_CMD_TO,
-            [ qr/more\s+than\s+once/xsmi, sub {} ]
+            [ qr/\Qmore than once\E/xi, sub {} ]
         ), 1, 'more than once error'
     );
     is( $pat_idx = $exp->expect($SHELL_CMD_TO, $DEFAULT_MENU_PROMPT),
@@ -49,14 +49,14 @@ subtest 'select five (twice) and two from menu with -u', sub {
 
 test_menu_to_five(
     'select five (twice) and two from menu WITHOUT -u', "5 2 5\n",
-    qr/^ five \r? $ \v? ^ two \r? $ \v ^ five \r? $/xsmi,
+    qr/^ five \r? $ \v? ^ two \r? $ \v ^ five \r? $/xmi,
     'selected item five twice and two once'
 );
 
 # test a different sort path in the code
 test_menu_to_five(
     'select five and two from menu with -s -u', "5 2\n",
-    qr/^ two \r? $ \v? ^ five \r? $/xsmi,
+    qr/^ two \r? $ \v? ^ five \r? $/xmi,
     'selected items two and five',
     { optarg => '-su' }
 );
