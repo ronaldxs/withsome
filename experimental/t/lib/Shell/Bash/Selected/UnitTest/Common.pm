@@ -6,6 +6,9 @@ use warnings;
 use Test::More;
 use Readonly;
 use FindBin qw($Bin);
+use Carp;
+
+use Test::Expect::Raw;
 
 use parent qw(Exporter); 
 
@@ -38,11 +41,14 @@ sub new_menu_to_n {
     my @other_opts = @_;
 
     Readonly my @MENU_OPTS => qw(one two three four five);
-    die "Didn't learn to count as high as $n"
+    croak "Didn't learn to count as high as $n"
         if ($n > @MENU_OPTS);
 
-    my $exp = Expect->new;
-    $exp->log_stdout(0);
+    my $exp = Test::Expect::Raw->new(
+        timeout     =>      $SHELL_CMD_TO,
+        prompt      =>      $DEFAULT_MENU_PROMPT,
+#        log_stdout  =>      1
+    );
     $exp->spawn($RUN_CMD, @other_opts, @MENU_OPTS[0 .. $n -1]);
 
     return $exp;
@@ -54,7 +60,7 @@ sub new_menu_to_five { new_menu_to_n(5, @_) }
 
 sub test_menu_to_n {
     my (    $n, $test_description, $menu_selection,
-            $selection_re, $selection_description,
+            $selected_lines, $selection_description,
             $opts
     ) = @_;
     my $exp = $opts->{exp} //
@@ -63,18 +69,9 @@ sub test_menu_to_n {
 
     subtest $test_description, sub {
         plan tests => 2 + (exists $opts->{exit_status} ? 2 : 0);
-        is( $pat_idx = $exp->expect($SHELL_CMD_TO, $DEFAULT_MENU_PROMPT),
-            1, 'got prompt'
+        $exp->expect_prompt_reply_lines(
+            $menu_selection, $selected_lines, $selection_description
         );
-        $exp->send($menu_selection);
-        is( $pat_idx = $exp->expect(
-                $SHELL_CMD_TO,
-                ref($selection_re) eq 'Regexp' ?
-                    [ $selection_re, sub {} ] :
-                    ('-re', $selection_re)
-            ), 1, $selection_description
-        );
-
         if (exists $opts->{exit_status}) {
             my (undef, $expect_error) =
                 $exp->expect($SHELL_CMD_TO, $DEFAULT_MENU_PROMPT);
